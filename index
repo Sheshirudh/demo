@@ -1,0 +1,111 @@
+import { Octokit } from "@octokit/rest";
+
+// ─── App-level client — lazy so dotenv is guaranteed to have loaded ───────────
+let _appOctokit: Octokit | null = null;
+
+function appOctokit(): Octokit {
+  if (!_appOctokit) {
+    _appOctokit = new Octokit({
+      auth: process.env.GITHUB_TOKEN, // Simpler: Just use a Personal Access Token
+    });
+  }
+  return _appOctokit;
+}
+
+// ─── Per-user client (approve as the actual developer) ───────────────────────
+export function getUserOctokit(token: string): Octokit {
+  return new Octokit({ auth: token });
+}
+
+// ─── Fetch PR diff and count line changes ────────────────────────────────────
+export interface DiffResult {
+  lines: string[];       // formatted diff lines for Block Kit
+  totalChanges: number;  // additions + deletions
+  fileCount: number;
+}
+
+export async function fetchPRDiff(
+  owner: string,
+  repo: string,
+  pullNumber: number
+): Promise<DiffResult> {
+  const { data: files } = await appOctokit().pulls.listFiles({
+    owner,
+    repo,
+    pull_number: pullNumber,
+    per_page: 30,
+  });
+
+  const lines: string[] = [];
+  let totalChanges = 0;
+
+  for (const file of files.slice(0, 5)) {
+    totalChanges += file.changes;
+    if (file.patch) {
+      lines.push(`*${file.filename}*`);
+      for (const line of file.patch.split("\n").slice(0, 15)) {
+        if (line.startsWith("+") && !line.startsWith("+++")) {
+          lines.push(`\`+ ${line.slice(1).trim()}\``);
+        } else if (line.startsWith("-") && !line.startsWith("---")) {
+          lines.push(`\`- ${line.slice(1).trim()}\``);
+        }
+      }
+    }
+  }
+
+  const realTotal = files.reduce((sum, f) => sum + f.changes, 0);
+  return { lines, totalChanges: realTotal, fileCount: files.length };
+}
+
+// ─── Get open PRs assigned to a reviewer ─────────────────────────────────────
+export async function getAssignedPRs(githubHandle: string) {
+  const { data } = await appOctokit().search.issuesAndPullRequests({
+    q: `is:pr is:open review-requested:${githubHandle}`,
+    per_page: 10,
+    sort: "created",
+    order: "desc",
+  });
+  return data.items;
+}
+
+// ─── Get open PRs for a whole org ────────────────────────────────────────────
+export async function getTeamPRs(org: string) {
+  const { data } = await appOctokit().search.issuesAndPullRequests({
+    q: `is:pr is:open org:${org}`,
+    per_page: 10,
+    sort: "updated",
+    order: "asc",
+  });
+  return data.items;
+}
+
+// ─── Submit a review ─────────────────────────────────────────────────────────
+export async function submitReview(
+  owner: string,
+  repo: string,
+  pullNumber: number,
+  event: "APPROVE" | "REQUEST_CHANGES",
+  userToken?: string
+) {
+  const octokit = userToken ? getUserOctokit(userToken) : appOctokit();
+  return octokit.pulls.createReview({
+    owner,
+    repo,
+    pull_number: pullNumber,
+    event,
+    body: event === "REQUEST_CHANGES" ? "Changes requested via WorkerB in Slack." : undefined,
+  });
+}
+
+// ─── List reviews on a PR ────────────────────────────────────────────────────
+export async function getPRReviews(owner: string, repo: string, pullNumber: number) {
+  const { data } = await appOctokit().pulls.listReviews({
+    owner,
+    repo,
+    pull_number: pullNumber,
+  });
+  return data;
+}
+
+// ─── Export for direct use in webhooks.ts ────────────────────────────────────
+export { appOctokit };
