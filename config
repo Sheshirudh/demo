@@ -1,7 +1,7 @@
 
 
 enabled=true
-environment=aws
+environment=gcp
 log_level=info
 id=5
 mode=http
