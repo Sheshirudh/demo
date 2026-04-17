@@ -1,7 +1,7 @@
 
 
 enabled=true
-environment=azure
+environment=railway
 log_level=info
 id=5
 mode=http
