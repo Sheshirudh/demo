@@ -1,4 +1,4 @@
-import { Octokit } from "@octokit/rest";
+export { Octokit } from "@octokit/rest";
 
 // ─── App-level client — lazy so dotenv is guaranteed to have loaded ───────────
 let _appOctokit: Octokit | null = null;
