@@ -4,6 +4,6 @@ enabled=true
 environment=azure
 log_level=info
 id=5
-mode=http
+mode=https
 flag=true
 
