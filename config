@@ -4,6 +4,6 @@ enabled=true
 environment=aws
 log_level=info
 id=6
-mode=http
+mode=https
 flag=true
 
