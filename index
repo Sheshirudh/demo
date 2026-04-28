@@ -1,9 +1,9 @@
-import { Octokit } from "@octokit/rest";
+export { Octokit } from "@octokit/rest";
 
 // ─── App-level client — lazy so dotenv is guaranteed to have loaded ───────────
 let _appOctokit: Octokit | null = null;
 
-function appOctokit(): Octokit {
+async function appOctokit(): Octokit {
   if (!_appOctokit) {
     _appOctokit = new Octokit({
       auth: process.env.GITHUB_TOKEN, // Simpler: Just use a Personal Access Token
